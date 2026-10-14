@@ -1,6 +1,9 @@
 use serde::Deserialize;
 
-/// A single skill definition loaded from a TOML file.
+/// A parsed skill configuration, ready to be compiled into a [`Skill`](crate::Skill).
+///
+/// This is the deserialized form of a skill TOML file. Use
+/// [`Skill::from_config`](crate::Skill::from_config) to compile it.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SkillConfig {
     /// Unique skill name.
@@ -8,10 +11,10 @@ pub struct SkillConfig {
     /// Human-readable description.
     #[serde(default)]
     pub description: Option<String>,
-    /// Optional trigger words for routing (e.g. ["小dropper", "吊弦"]).
+    /// Optional trigger words for routing (e.g. `["小dropper", "吊弦"]`).
     #[serde(default)]
     pub triggers: Vec<String>,
-    /// Extraction rules.
+    /// Extraction rules. Must not be empty.
     pub extractors: Vec<ExtractorConfig>,
     /// Optional output schema for validation.
     #[serde(default)]
@@ -19,6 +22,9 @@ pub struct SkillConfig {
 }
 
 /// A single extraction rule.
+///
+/// The `pattern` field must contain a `(?P<value>...)` named capture group.
+/// The captured text becomes the value associated with `key`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ExtractorConfig {
     /// Output field name. Supports any Unicode (Chinese, Japanese, etc.).
@@ -43,31 +49,56 @@ fn default_true() -> bool {
     true
 }
 
-/// Built-in post-processing operations.
+/// A built-in value transformation.
+///
+/// Post-processors run in the order they appear in
+/// [`ExtractorConfig::postprocess`].
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PostProcess {
+    /// Strip leading and trailing whitespace.
     Trim,
+    /// Convert to lowercase.
     Lowercase,
+    /// Convert to uppercase.
     Uppercase,
+    /// Remove paired `"..."` or `'...'`.
     StripQuotes,
+    /// Replace `\` with `/`.
     NormalizePath,
-    Replace { pattern: String, replacement: String },
-    FilterOut { pattern: String },
+    /// Regex replace.
+    Replace {
+        /// Regex to search for.
+        pattern: String,
+        /// Replacement string.
+        replacement: String,
+    },
+    /// Drop values matching the given regex.
+    FilterOut {
+        /// Regex that, if matched, causes the value to be dropped.
+        pattern: String,
+    },
 }
 
 /// Output schema declaration.
+///
+/// Declares expected types for extracted keys. After extraction, the
+/// framework validates the result and reports mismatches in
+/// [`ExtractResult::errors`](crate::ExtractResult::errors).
 #[derive(Debug, Clone, Deserialize)]
 pub struct OutputSchema {
+    /// Field name to type declaration.
     #[serde(flatten)]
     pub fields: std::collections::HashMap<String, FieldSpec>,
 }
 
+/// Type declaration for a single output field.
 #[derive(Debug, Clone, Deserialize)]
 pub struct FieldSpec {
-    /// Expected type: "string", "path", "int", "float", "bool".
+    /// Expected type: `"string"`, `"path"`, `"int"`, `"float"`, `"bool"`.
     #[serde(rename = "type", default = "default_type")]
     pub kind: String,
+    /// If true, the field must be present after extraction.
     #[serde(default)]
     pub required: bool,
 }

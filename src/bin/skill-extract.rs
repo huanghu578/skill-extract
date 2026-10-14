@@ -1,3 +1,23 @@
+//! Command-line entry point for `skill-extract`.
+//!
+//! Supports four modes:
+//!
+//! ```text
+//! skill-extract <skill.toml> <text>
+//! skill-extract --dir <skills_dir> --route <text>
+//! skill-extract --dir <skills_dir> --list
+//! skill-extract <skill.toml> --stdin
+//! ```
+//!
+//! Exit codes:
+//!
+//! | Code | Meaning |
+//! |------|---------|
+//! | 0 | Success; all required keys present |
+//! | 1 | Configuration or I/O error |
+//! | 2 | Extraction incomplete |
+//! | 3 | No skill matched (route mode only) |
+
 use skill_extract::{Skill, SkillRegistry};
 use std::env;
 use std::process;

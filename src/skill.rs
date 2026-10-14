@@ -31,9 +31,16 @@ pub(crate) enum CompiledPostProcess {
 }
 
 /// The result of an extraction.
+///
+/// Serializes to JSON with three fields: `values`, `missing`, `errors`.
+/// Use [`is_complete`](ExtractResult::is_complete) to check whether all
+/// required keys were found and no schema violations occurred.
 #[derive(Debug, Clone, Serialize)]
 pub struct ExtractResult {
     /// Successfully extracted key-value pairs.
+    ///
+    /// Both `key` and `key_en` (if configured) appear, pointing to the
+    /// same values.
     pub values: HashMap<String, Vec<String>>,
     /// Required keys that were not found.
     pub missing: Vec<String>,
@@ -42,41 +49,77 @@ pub struct ExtractResult {
 }
 
 impl ExtractResult {
-    /// Returns true if no missing keys and no errors.
+    /// Returns `true` if no keys are missing and no errors occurred.
     pub fn is_complete(&self) -> bool {
         self.missing.is_empty() && self.errors.is_empty()
     }
 
-    /// Pretty JSON.
+    /// Serialize to pretty-printed JSON.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self)
-            .unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+        serde_json::to_string_pretty(self).unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
     }
 
-    /// Compact JSON.
+    /// Serialize to compact JSON.
     pub fn to_json_compact(&self) -> String {
-        serde_json::to_string(self)
-            .unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
+        serde_json::to_string(self).unwrap_or_else(|e| format!(r#"{{"error":"{}"}}"#, e))
     }
 
-    /// Get the first value for a key.
+    /// Get the first value for a key, if any.
     pub fn get_first(&self, key: &str) -> Option<&str> {
-        self.values.get(key).and_then(|v| v.first()).map(|s| s.as_str())
+        self.values
+            .get(key)
+            .and_then(|v| v.first())
+            .map(|s| s.as_str())
     }
 }
 
 /// A compiled skill ready to extract from text.
+///
+/// A `Skill` is built once from a TOML configuration, compiling all
+/// regexes and post-processing pipelines. After construction,
+/// [`extract`](Skill::extract) is infallible: missing keys and schema
+/// violations are reported in the returned [`ExtractResult`] rather than
+/// as errors.
+///
+/// # Examples
+///
+/// ```
+/// use skill_extract::Skill;
+///
+/// let toml = r#"
+/// name = "demo"
+/// [[extractors]]
+/// key = "x"
+/// pattern = 'x[:：]\s*(?P<value>\w+)'
+/// required = true
+/// "#;
+///
+/// let skill = Skill::from_toml(toml).unwrap();
+/// let result = skill.extract("x: hello");
+/// assert_eq!(result.get_first("x"), Some("hello"));
+/// ```
 #[derive(Debug)]
 pub struct Skill {
+    /// Skill name.
     pub name: String,
+    /// Human-readable description.
     pub description: Option<String>,
+    /// Trigger words for routing.
     pub triggers: Vec<String>,
     pub(crate) extractors: Vec<CompiledExtractor>,
     pub(crate) schema: Option<crate::config::OutputSchema>,
 }
 
 impl Skill {
-    /// Load from a TOML file.
+    /// Load a skill from a TOML file.
+    ///
+    /// Returns [`SkillError::ConfigNotFound`] if the file does not exist,
+    /// [`SkillError::Io`] for other read errors, and [`SkillError::Toml`]
+    /// if the content is not valid TOML.
+    ///
+    /// # Errors
+    ///
+    /// See [`SkillError`] for the full list.
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let content = fs::read_to_string(path).map_err(|e| {
@@ -97,18 +140,33 @@ impl Skill {
         Self::from_toml(&content)
     }
 
-    /// Load from a TOML string.
+    /// Load a skill from an in-memory TOML string.
+    ///
+    /// Useful for tests and for embedding configurations in source.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SkillError::Toml`] on parse failure, or any of the
+    /// structural errors from [`Skill::from_config`].
     pub fn from_toml(toml_str: &str) -> Result<Self> {
-        let config: SkillConfig = toml::from_str(toml_str).map_err(|e| {
-            SkillError::Toml {
-                path: "<inline>".to_string(),
-                source: e,
-            }
+        let config: SkillConfig = toml::from_str(toml_str).map_err(|e| SkillError::Toml {
+            path: "<inline>".to_string(),
+            source: e,
         })?;
         Self::from_config(config)
     }
 
-    /// Build from a parsed config.
+    /// Build a skill from an already-parsed [`SkillConfig`].
+    ///
+    /// This is where regex compilation happens. If any pattern is invalid
+    /// or lacks a `(?P<value>...)` group, an error is returned and no
+    /// `Skill` is produced.
+    ///
+    /// # Errors
+    ///
+    /// - [`SkillError::InvalidConfig`] — empty extractor list.
+    /// - [`SkillError::InvalidPattern`] — regex failed to compile.
+    /// - [`SkillError::MissingValueGroup`] — pattern lacks `(?P<value>...)`.
     pub fn from_config(config: SkillConfig) -> Result<Self> {
         if config.extractors.is_empty() {
             return Err(SkillError::InvalidConfig(
@@ -130,12 +188,19 @@ impl Skill {
         })
     }
 
-    /// Check whether this skill's triggers match the given text.
+    /// Returns `true` if any of this skill's triggers appears in `text`.
+    ///
+    /// Trigger matching is a simple substring check, not a regex.
     pub fn matches(&self, text: &str) -> bool {
         self.triggers.iter().any(|t| text.contains(t))
     }
 
     /// Extract all configured keys from `text`.
+    ///
+    /// This method never fails. Keys with `required = true` that are not
+    /// found land in [`ExtractResult::missing`]. Schema validation failures
+    /// land in [`ExtractResult::errors`]. Successfully extracted values are
+    /// in [`ExtractResult::values`].
     pub fn extract(&self, text: &str) -> ExtractResult {
         let mut values: HashMap<String, Vec<String>> = HashMap::new();
         let mut missing: Vec<String> = Vec::new();
@@ -198,10 +263,14 @@ impl Skill {
             }
         }
 
-        ExtractResult { values, missing, errors }
+        ExtractResult {
+            values,
+            missing,
+            errors,
+        }
     }
 
-    /// Extract and return JSON directly.
+    /// Convenience: extract and serialize to pretty JSON.
     pub fn extract_to_json(&self, text: &str) -> String {
         self.extract(text).to_json()
     }
@@ -214,7 +283,9 @@ fn compile_extractor(ec: ExtractorConfig) -> Result<CompiledExtractor> {
     })?;
 
     if !regex.capture_names().flatten().any(|n| n == "value") {
-        return Err(SkillError::MissingValueGroup { key: ec.key.clone() });
+        return Err(SkillError::MissingValueGroup {
+            key: ec.key.clone(),
+        });
     }
 
     let mut postprocess = Vec::with_capacity(ec.postprocess.len());
@@ -225,7 +296,10 @@ fn compile_extractor(ec: ExtractorConfig) -> Result<CompiledExtractor> {
             PostProcess::Uppercase => CompiledPostProcess::Uppercase,
             PostProcess::StripQuotes => CompiledPostProcess::StripQuotes,
             PostProcess::NormalizePath => CompiledPostProcess::NormalizePath,
-            PostProcess::Replace { pattern, replacement } => {
+            PostProcess::Replace {
+                pattern,
+                replacement,
+            } => {
                 let regex = Regex::new(&pattern).map_err(|e| SkillError::InvalidPattern {
                     key: ec.key.clone(),
                     reason: format!("replace pattern: {}", e),

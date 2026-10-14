@@ -3,10 +3,11 @@ use crate::error::{Result, SkillError};
 use std::collections::HashMap;
 
 /// Validate extracted values against an output schema.
-pub fn validate_schema(
-    values: &HashMap<String, Vec<String>>,
-    schema: &OutputSchema,
-) -> Result<()> {
+///
+/// Returns [`SkillError::MissingRequired`] if a required field is absent,
+/// or [`SkillError::TypeMismatch`] if a value does not match its declared
+/// type.
+pub fn validate_schema(values: &HashMap<String, Vec<String>>, schema: &OutputSchema) -> Result<()> {
     for (key, spec) in &schema.fields {
         match values.get(key) {
             Some(vals) => {

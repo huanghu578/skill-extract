@@ -20,13 +20,13 @@ required = true
     )
     .unwrap();
 
-    let out = bin()
-        .arg(&skill)
-        .arg("x: hello")
-        .output()
-        .expect("run cli");
+    let out = bin().arg(&skill).arg("x: hello").output().expect("run cli");
 
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("\"x\""));
     assert!(stdout.contains("hello"));
@@ -107,7 +107,11 @@ required = true
         .output()
         .expect("run cli");
 
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("ok"));
 }
