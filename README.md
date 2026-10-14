@@ -562,4 +562,4 @@ API; CLI users get the `skill-extract` executable via `cargo install`.
 
 ## License
 
-MIT
+MIT or Apache-2.0
