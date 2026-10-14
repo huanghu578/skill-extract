@@ -1,0 +1,23 @@
+name = "extract_paths"
+description = "Extract working directory and output file from an instruction"
+triggers = ["工作文件夹", "输出文件"]
+
+[[extractors]]
+key = "工作文件夹"
+key_en = "working_dir"
+pattern = '工作文件夹[:：]\s*(?P<value>[^\s，,。；;、]+)'
+required = true
+multi = false
+postprocess = ["trim", "strip_quotes", "normalize_path"]
+
+[[extractors]]
+key = "输出文件"
+key_en = "output_file"
+pattern = '输出文件[:：]\s*(?P<value>[^\s，,。；;、]+)'
+required = true
+multi = false
+postprocess = ["trim", "strip_quotes", "normalize_path"]
+
+[output_schema]
+working_dir = { type = "path", required = true }
+output_file = { type = "path", required = true }

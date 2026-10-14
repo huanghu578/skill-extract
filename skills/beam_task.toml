@@ -1,0 +1,31 @@
+name = "beam_task"
+description = "Beam calculation task"
+triggers = ["小beam", "腕臂"]
+
+[[extractors]]
+key = "beam_type"
+pattern = 'beam_type[:：]\s*(?P<value>[A-Za-z0-9+\-_/]+)'
+required = true
+multi = false
+postprocess = ["trim", "strip_quotes"]
+
+[[extractors]]
+key = "输入文件"
+key_en = "input_file"
+pattern = '输入文件[:：]\s*(?P<value>[^\s，,。；;、]+\.xlsx)'
+required = true
+multi = false
+postprocess = ["trim", "strip_quotes", "normalize_path"]
+
+[[extractors]]
+key = "输出文件"
+key_en = "output_file"
+pattern = '输出文件[:：]\s*(?P<value>[^\s，,。；;、]+\.xlsx)'
+required = true
+multi = false
+postprocess = ["trim", "strip_quotes", "normalize_path"]
+
+[output_schema]
+beam_type = { type = "string", required = true }
+input_file = { type = "path", required = true }
+output_file = { type = "path", required = true }

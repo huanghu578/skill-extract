@@ -1,0 +1,32 @@
+name = "dropper_task"
+description = "Extract suspension_type and I/O files for dropper calculation"
+triggers = ["小dropper", "吊弦"]
+
+[[extractors]]
+key = "suspension_type"
+key_en = "suspension_type"
+pattern = 'suspension_type[:：]\s*(?P<value>[A-Za-z0-9+\-_/]+)'
+required = true
+multi = false
+postprocess = ["trim", "strip_quotes"]
+
+[[extractors]]
+key = "输入文件"
+key_en = "input_file"
+pattern = '输入文件[:：]\s*(?P<value>[^\s，,。；;、]+\.xlsx)'
+required = true
+multi = false
+postprocess = ["trim", "strip_quotes", "normalize_path"]
+
+[[extractors]]
+key = "输出文件"
+key_en = "output_file"
+pattern = '输出文件[:：]\s*(?P<value>[^\s，,。；;、]+\.xlsx)'
+required = true
+multi = false
+postprocess = ["trim", "strip_quotes", "normalize_path"]
+
+[output_schema]
+suspension_type = { type = "string", required = true }
+input_file = { type = "path", required = true }
+output_file = { type = "path", required = true }
