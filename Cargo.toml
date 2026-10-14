@@ -2,9 +2,16 @@
 name = "skill-extract"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
-description = "Configuration-driven key-value extraction framework"
+description = "Configuration-driven key-value extraction from natural language instructions with Unicode-native keys and trigger-based routing"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+rust-version = "1.70"
 repository = "https://github.com/huanghu578/skill-extract"
+homepage = "https://github.com/huanghu578/skill-extract"
+documentation = "https://docs.rs/skill-extract"
+keywords = ["extraction", "regex", "config", "toml", "agent"]
+categories = ["text-processing", "config", "parser-implementations"]
+exclude = [".github", "CHANGELOG.md", "sync.bat"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -23,3 +30,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "skill-extract"
 path = "src/bin/skill-extract.rs"
+
+[package.metadata.docs.rs]
+all-features = true
